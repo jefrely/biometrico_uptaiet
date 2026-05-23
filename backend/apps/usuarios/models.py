@@ -29,3 +29,18 @@ class Usuario(AbstractUser): #usuario hereda de abstractuser
         db_table = "usuarios" #dice a django como nombrar la tabla
         verbose_name = "Usuario" #nombre que django muestra en el panel 
         verbose_name_plural = "Usuarios"
+
+
+
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.views import TokenObtainPairView
+
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    @classmethod
+    def get_token(cls, user):
+        token = super().get_token(user)
+        # Agregar datos del usuario al token
+        token['rol']= user.rol
+        token['username']= user.username
+        token['email'] = user.email
+        return token

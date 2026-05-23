@@ -22,11 +22,13 @@ class RegistroAsistenciaSerializer (serializers.ModelSerializer):
         fields = ["id","empleado","empleado_nombre", "empleado_cedula", "tipo", "tipo_display", "estado", "estado_display", "timestamp", "hora", "fecha",
                   "es_retardo", "minutos_retardo", "horas_trabajadas", "observacion"]
         
-    def get_hora (self, obj):
-        return obj.timestamp.strftime("%I:%M:%p")
-    
-    def get_fecha (self, obj):
-        return obj.timestamp.strftime("%d/%m/%Y")
+    def get_hora(self, obj):
+        from django.utils import timezone
+        return timezone.localtime(obj.timestamp).strftime('%I:%M %p')
+
+    def get_fecha(self, obj):
+        from django.utils import timezone
+        return timezone.localtime(obj.timestamp).strftime('%d/%m/%Y')
     
 
 class AusenciaSerializer (serializers.ModelSerializer):

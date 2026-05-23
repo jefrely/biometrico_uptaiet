@@ -22,3 +22,19 @@ class LogAdmin(admin.ModelAdmin):
     list_filter= ["tabla_afectada"]
     readonly_fields= ["usuario", "accion", "tabla_afectada", "registro_id", "datos_antes",
     "datos_despues", "ip", "timestamp"]
+
+
+from .models import PermisoEmpleado, DiaFeriado
+
+@admin.register(PermisoEmpleado)
+class PermisoEmpleadoAdmin(admin.ModelAdmin):
+    list_display = ["empleado", "tipo", "fecha_inicio", "fecha_fin", "estado", "aprobado_por"]
+    list_filter = ["tipo", "estado"]
+    search_fields= ["empleado__cedula", "empleado__nombres","empleado_apellidos"]
+
+
+@admin.register(DiaFeriado)
+class DiaFeriadoAdmin (admin.ModelAdmin):
+    list_display=["nombre", "fecha", "obligatorio"]
+    list_filter=["obligatorio"]
+    ordering=["fecha"]

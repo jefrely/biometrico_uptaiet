@@ -1,12 +1,14 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
-import Login           from './pages/Login'
-import Marcaje         from './pages/Marcaje'
-import Dashboard       from './pages/Dashboard'
-import Personal        from './pages/Personal'
-import Reportes        from './pages/Reportes'
+import Login from './pages/Login'
+import Marcaje from './pages/Marcaje'
+import Dashboard from './pages/Dashboard'
+import Personal from './pages/Personal'
+import Reportes from './pages/Reportes'
 import RegistroHuellas from './pages/RegistroHuellas'
 import Horarios from './pages/Horarios'
+import Incidencias from './pages/Incidencias'
+import Historial from './pages/Historial'
 
 function RutaProtegida({ children }) {
   const { usuario, cargando } = useAuth()
@@ -41,6 +43,12 @@ function App() {
             <RutaProtegida><Horarios /></RutaProtegida>
           }/>
           <Route path="*" element={<Navigate to="/dashboard" />} />
+          <Route path="/incidencias" element={
+            <RutaProtegida><Incidencias /></RutaProtegida>
+          }/>
+          <Route path="/historial" element={
+            <RutaProtegida><Historial /></RutaProtegida>
+          }/>
         </Routes>
       </BrowserRouter>
     </AuthProvider>

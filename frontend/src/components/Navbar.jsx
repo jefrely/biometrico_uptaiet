@@ -3,19 +3,21 @@ import { useAuth } from '../context/AuthContext'
 
 export default function Navbar() {
   const { usuario, logout } = useAuth()
-  const navigate  = useNavigate()
-  const location  = useLocation()
+  const navigate= useNavigate()
+  const location= useLocation()
 
   const links = [
-    { path: '/dashboard', label: 'Dashboard',  roles: ['admin', 'supervisor', 'operador'] },
-    { path: '/marcaje',   label: 'Marcaje',     roles: ['admin', 'supervisor', 'operador'] },
-    { path: '/personal',  label: 'Personal',    roles: ['admin', 'supervisor'] },
-    { path: '/horarios',  label: 'Horarios',    roles: ['admin'] },
-    { path: '/reportes',  label: 'Reportes',    roles: ['admin', 'supervisor'] },
+    { path:'/dashboard',label:'Dashboard',roles: ['admin','supervisor','operador']},
+    { path:'/marcaje',label:'Marcaje',roles: ['admin','supervisor','operador']},
+    { path:'/personal',label:'Personal',roles: ['admin','supervisor']},
+    { path:'/horarios',label:'Horarios',roles: ['admin']},
+    { path:'/reportes',label:'Reportes',roles: ['admin','supervisor']},
+    { path:'/incidencias',label:'Incidencias',roles: ['admin','supervisor']},
+    { path: '/historial', label: 'Historial', roles: ['admin', 'supervisor']},
   ]
 
   const visibles = links.filter(l => l.roles.includes(usuario?.rol))
-  const activo   = (path) => location.pathname.startsWith(path)
+  const activo= (path) => location.pathname.startsWith(path)
 
   return (
     <nav className="bg-blue-900 text-white px-6 py-3 flex items-center justify-between shadow-lg">

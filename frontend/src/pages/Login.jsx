@@ -7,6 +7,7 @@ export default function Login() {
   const [error, setError] = useState('')
   const [cargando, setCargando] = useState(false)
   const { login } = useAuth()
+  const [verPassword, setVerPassword] = useState(false)
   const navigate = useNavigate()
 
   const handleSubmit = async (e) => {
@@ -48,18 +49,27 @@ export default function Login() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Contraseña
-            </label>
-            <input
-              type="password"
-              value={form.password}
-              onChange={e => setForm({ ...form, password: e.target.value })}
-              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Ingrese su contraseña"
-              required
-            />
-          </div>
+  <label className="block text-sm font-medium text-gray-700 mb-1">
+    Contraseña
+  </label>
+  <div className="relative">
+    <input
+      type={verPassword ? 'text' : 'password'}
+      value={form.password}
+      onChange={e => setForm({ ...form, password: e.target.value })}
+      className="w-full border border-gray-300 rounded-lg px-4 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500"
+      placeholder="Ingrese su contraseña"
+      required
+    />
+    <button
+      type="button"
+      onClick={() => setVerPassword(!verPassword)}
+      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+    >
+      {verPassword ? '🙈' : '👁️'}
+    </button>
+  </div>
+</div>
 
           {error && (
             <p className="text-red-500 text-sm text-center">{error}</p>

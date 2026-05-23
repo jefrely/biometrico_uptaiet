@@ -107,3 +107,99 @@ class LogAuditoria(models.Model):
 
     def __str__(self):
         return f"{self.usuario} - {self.accion} ({self.timestamp.strftime("%d/%m/%Y  %H:%M")})"
+    
+class PermisoEmpleado(models.Model):
+
+    class TipoPermiso(models.TextChoices):
+        PERMISO="PERMISO", "Permiso"
+        REPOSO="REPOSO", "Reposo Médico"
+        VACACIONES= "VACACIONES", "Vacaciones"
+        COMISION="COMISION", "Comisión"
+        MATERNIDAD= "MATERNIDAD", "Maternidad/Paternidad"
+        DUELO= "DUELO", "Duelo"
+        CAPACITACION= "CAPACITACION", "Capacitación"
+
+    class EstadoPermiso (models.TextChoices):
+        PENDIENTE="PENDIENTE", "Pendiente"
+        APROBADO="APROBADO", "Aprobado"
+        RECHAZADO="RECHAZADO", "Rechazado"
+
+    empleado= models.ForeignKey(
+        "personal.Empleado",
+        on_delete=models.PROTECT,
+        related_name="permisos"
+    )
+
+    tipo= models.CharField(
+        max_length=20,
+        choices=TipoPermiso.choices,
+        default=TipoPermiso.PERMISO
+    )
+
+    fecha_inicio= models.DateField()
+    fecha_fin=models.DateField()
+    motivo=models.TextField()
+    documento= models.FileField(
+        upload_to="permisos_documentos/",
+        null=True,
+        blank=True
+    )
+
+    estado=models.CharField(
+        max_length=10,
+        choices=EstadoPermiso.choices,
+        default=EstadoPermiso.PENDIENTE
+    )
+
+    aprobado_por=models.ForeignKey(
+        "usuarios.Usuario",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="permisos_aprobados"
+    )
+
+    observacion= models.TextField(blank=True)
+    activo=models.BooleanField(default=True)
+    created_at= models.DateTimeField(auto_now_add=True)
+    updated_at=models.DateTimeField(auto_now=True)
+
+
+    class Meta:
+        db_table= "permisos_empleados"
+        verbose_name= "Permiso de empleado"
+        verbose_name_plural= "Permisos de empleados"
+        ordering= ["-fecha_inicio"]
+
+
+    def __str__(self):
+        return f"{self.empleado.nombre_completo} - {self.get_tipo_display()} ({self.fecha_inicio} al {self.fecha_fin})"
+    
+    def cubre_fecha(self, fecha):
+        """retorna true si este permiso cubre la fecha dada y está aprobado"""
+        return(
+            self.estado==self.EstadoPermiso.APROBADO and
+            self.activo and
+            self.fecha_inicio <=fecha <=self.fecha_fin
+        )
+    
+class DiaFeriado(models.Model):
+    nombre= models.CharField(max_length=200)
+    fecha= models.DateField(unique=True)
+    obligatorio= models.BooleanField(default=True)
+    descripcion= models.TextField(blank=True)
+    created_at= models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table ="dias_feriados"
+        verbose_name="Día feriado"
+        verbose_name_plural = "Días feriados"
+        ordering = ["fecha"]
+
+    def __str__(self):
+        return f"{self.nombre} - {self.fecha}"
+    
+    @classmethod
+    def es_feriado(cls, fecha):
+        """retorna true si la fecha es un dia feriado"""
+        return cls.objects.filter(fecha=fecha, obligatorio=True).exists()

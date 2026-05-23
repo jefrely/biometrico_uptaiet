@@ -6,6 +6,8 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
 from .models import Usuario
 from .serializers import UsuarioSerializer, CambiarPasswordSerializer
+from rest_framework_simplejwt.views import TokenObtainPairView
+from .models import CustomTokenObtainPairSerializer
 
 class LoginView (APIView):
     """""
@@ -41,7 +43,7 @@ class LoginView (APIView):
         usuario.ultimo_acceso_ip= request.META.get("REMOTE_ADDR")
         usuario.save (update_fields=["ultimo_acceso_ip"])
 
-        refresh= RefreshToken.for_user(usuario)
+        refresh = CustomTokenObtainPairSerializer.get_token(usuario)
 
         return Response({
             "access": str(refresh.access_token),
@@ -78,3 +80,6 @@ class PerfilView(APIView):
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=400)
+    
+class CustomTokenObtainPairView(TokenObtainPairView):
+    serializer_class = CustomTokenObtainPairSerializer

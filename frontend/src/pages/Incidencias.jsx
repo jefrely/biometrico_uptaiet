@@ -1,15 +1,14 @@
 import { useState, useEffect } from 'react'
-import Navbar from '../components/Navbar'
 import api from '../services/api'
 
 const TIPOS_PERMISO = [
-  { value: 'PERMISO',label: 'Permiso'},
-  { value: 'REPOSO',label: 'Reposo Médico'},
-  { value: 'VACACIONES',label: 'Vacaciones'},
-  { value: 'COMISION',label: 'Comisión'},
-  { value: 'MATERNIDAD',label: 'Maternidad/Paternidad'},
-  { value: 'DUELO',label: 'Duelo'},
-  { value: 'CAPACITACION',label: 'Capacitación'},
+  {value:'PERMISO',label:'Permiso'},
+  {value:'REPOSO',label:'Reposo Médico'},
+  {value:'VACACIONES',label:'Vacaciones'},
+  {value:'COMISION',label:'Comisión'},
+  {value:'MATERNIDAD',label:'Maternidad/Paternidad'},
+  {value:'DUELO',label:'Duelo'},
+  {value:'CAPACITACION',label:'Capacitación'},
 ]
 
 const COLORES_ESTADO = {
@@ -41,11 +40,18 @@ export default function Incidencias() {
   const [filtroEstado,setFiltroEstado]= useState('')
 
   const formPermisoVacio = {
-    empleado_id:'', tipo: 'PERMISO',
-    fecha_inicio:'', fecha_fin: '', motivo: ''
+    empleado_id:'', 
+    tipo: 'PERMISO',
+    fecha_inicio:'', 
+    fecha_fin: '', 
+    motivo: '', 
+    documento: null
   }
   const formFeriadoVacio = {
-    nombre: '', fecha: '',obligatorio: true, descripcion: ''
+    nombre: '', 
+    fecha: '',
+    obligatorio: true, 
+    descripcion: ''
   }
   const [formPermiso,setFormPermiso] = useState(formPermisoVacio)
   const [formFeriado,setFormFeriado] = useState(formFeriadoVacio)
@@ -80,7 +86,7 @@ export default function Incidencias() {
 
   const guardarPermiso = async () => {
     if (!formPermiso.empleado_id || !formPermiso.fecha_inicio || !formPermiso.fecha_fin || !formPermiso.motivo) {
-      mostrarMensaje('Complete todos los campos requeridos.', 'error')
+      mostrarMensaje('Complete todos los campos requeridos.','error')
       return
     }
     if (formPermiso.fecha_fin < formPermiso.fecha_inicio) {
@@ -88,13 +94,29 @@ export default function Incidencias() {
       return
     }
     try {
-      await api.post('/asistencia/permisos/', formPermiso)
+      const formData = new FormData()
+      formData.append('empleado_id',formPermiso.empleado_id)
+      formData.append('tipo',formPermiso.tipo)
+      formData.append('fecha_inicio', formPermiso.fecha_inicio)
+      formData.append('fecha_fin',formPermiso.fecha_fin)
+      formData.append('motivo',formPermiso.motivo)
+      if (formPermiso.documento) {
+        formData.append('documento',formPermiso.documento)
+      }
+
+      const token = localStorage.getItem('access_token')
+      await fetch('/api/asistencia/permisos/', {
+        method:  'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+       body:    formData
+      })
+
       mostrarMensaje('Permiso creado correctamente.')
       setModalPermiso(false)
       setFormPermiso(formPermisoVacio)
       cargarTodo()
     } catch (e) {
-      mostrarMensaje(e.response?.data?.error || 'Error al crear permiso.', 'error')
+      mostrarMensaje('Error al crear permiso.', 'error')
     }
   }
 
@@ -156,7 +178,7 @@ export default function Incidencias() {
 
   if (cargando) return (
     <div className="min-h-screen bg-gray-100">
-      <Navbar />
+      
       <div className="flex items-center justify-center h-64">
         <p className="text-gray-500">Cargando...</p>
       </div>
@@ -165,7 +187,7 @@ export default function Incidencias() {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      <Navbar />
+      
 
       <div className="max-w-7xl mx-auto px-6 py-8">
         <h2 className="text-2xl font-bold text-gray-800 mb-6">Incidencias y Permisos</h2>
@@ -211,6 +233,7 @@ export default function Incidencias() {
                   </button>
                 ))}
               </div>
+
               <button onClick={() => setModalPermiso(true)}
                 className="bg-blue-900 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-800">
                 + Nuevo Permiso
@@ -270,6 +293,14 @@ export default function Incidencias() {
                               Revisar
                             </button>
                           )}
+
+                          {p.documento && (
+                            <a href={p.documento} target="_blank" rel="noreferrer"
+                              className="text-blue-500 hover:text-blue-700 text-xs font-medium">
+                              Ver doc
+                            </a>
+                          )}
+
                           <button onClick={() => eliminarPermiso(p.id)}
                             className="text-red-500 hover:text-red-700 text-xs font-medium">
                             Eliminar
@@ -388,6 +419,20 @@ export default function Incidencias() {
                   placeholder="Describa el motivo del permiso..."
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
               </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Documento de soporte (PDF o imagen)
+                </label>
+                <input
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  onChange={e => setFormPermiso({...formPermiso, documento: e.target.files[0]})}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <p className="text-xs text-gray-400 mt-1">Opcional — reposo médico, constancia, etc.</p>
+              </div>
+
             </div>
             <div className="flex gap-3 mt-6">
               <button onClick={guardarPermiso}

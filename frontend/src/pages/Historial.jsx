@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import Navbar from '../components/Navbar'
 import api from '../services/api'
 
 export default function Historial() {
@@ -80,7 +79,7 @@ export default function Historial() {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      <Navbar />
+     
 
       <div className="max-w-7xl mx-auto px-6 py-8">
         <h2 className="text-2xl font-bold text-gray-800 mb-6">Historial de Asistencia</h2>

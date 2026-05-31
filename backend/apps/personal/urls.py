@@ -1,6 +1,6 @@
 from django.urls import path
 from .views import (
-    DepartamentoListView, DepartamentoDetailView, EmpleadoListView, EmpleadoDetailView, HorarioListView, HorarioEmpleadoView
+    DepartamentoListView, DepartamentoDetailView, EmpleadoListView, EmpleadoDetailView, HorarioListView, HorarioEmpleadoView, PerfilEmpleadoView
 )
 
 urlpatterns = [
@@ -10,4 +10,5 @@ urlpatterns = [
     path ("empleados/<int:pk>/", EmpleadoDetailView.as_view(), name="empleado-details"),
     path ("horarios/", HorarioListView.as_view(), name="horarios"),
     path ("horarios/<int:empleado_id>/", HorarioEmpleadoView.as_view(), name="horario-empleado"),
+    path('perfil/<int:empleado_id>/', PerfilEmpleadoView.as_view(), name='perfil-empleado'),
 ]

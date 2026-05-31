@@ -55,7 +55,11 @@ class EmpleadoListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        empleados= Empleado.objects.filter(activo=True).select_related("departamento")
+        incluir_inactivos = request.query_params.get('incluir_inactivos') == 'true'
+        if incluir_inactivos:
+            empleados = Empleado.objects.all().select_related('departamento')
+        else:
+            empleados = Empleado.objects.filter(activo=True).select_related('departamento')
         tipo= request.query_params.get("tipo")
         depto  = request.query_params.get("departamento")
         if tipo:
@@ -189,3 +193,116 @@ class HorarioEmpleadoView(APIView):
             return Response ({"ok": True, "msg": "Horario Eliminado"})
         except Horario.DoesNotExist:
             return Response ({"error": "Horario no encontrado"}, status=404)
+        
+class PerfilEmpleadoView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, empleado_id):
+        from django.utils import timezone
+        import datetime
+
+        try:
+            empleado = Empleado.objects.get(id=empleado_id)
+        except Empleado.DoesNotExist:
+            return Response({'error': 'Empleado no encontrado.'}, status=404)
+
+        # Huellas registradas
+        from apps.biometrico.models import HuellaDigital
+        huellas = HuellaDigital.objects.filter(empleado=empleado, activa=True).values(
+            'numero_dedo', 'calidad', 'fecha_registro'
+        )
+        DEDOS = {
+            1:'Pulgar derecho', 2:'Índice derecho', 3:'Medio derecho',
+            4:'Anular derecho', 5:'Meñique derecho', 6:'Pulgar izquierdo',
+            7:'Índice izquierdo', 8:'Medio izquierdo', 9:'Anular izquierdo',
+            10:'Meñique izquierdo'
+        }
+        huellas_data = [{
+            'numero_dedo': h['numero_dedo'],
+            'nombre_dedo': DEDOS.get(h['numero_dedo'], f'Dedo {h["numero_dedo"]}'),
+            'calidad':h['calidad'],
+            'fecha': timezone.localtime(h['fecha_registro']).strftime('%d/%m/%Y'),
+        } for h in huellas]
+
+        # Horarios
+        horarios = Horario.objects.filter(empleado=empleado, activo=True).values(
+            'dia','hora_entrada','hora_salida','tolerancia_min'
+        )
+        DIAS_ORDEN = ['lunes','martes','miercoles','jueves','viernes','sabado','domingo']
+        DIAS_LABEL = {'lunes':'Lunes','martes':'Martes','miercoles':'Miércoles','jueves':'Jueves','viernes':'Viernes','sabado':'Sábado',
+                      'domingo':'Domingo'  
+        }
+
+        horarios_data = sorted([{
+            'dia':h['dia'],
+            'dia_label':DIAS_LABEL.get(h['dia'], h['dia']),
+            'hora_entrada': str(h['hora_entrada'])[:5],
+            'hora_salida':  str(h['hora_salida'])[:5],
+            'tolerancia':h['tolerancia_min'],
+        } for h in horarios], key=lambda x: DIAS_ORDEN.index(x['dia']) if x['dia'] in DIAS_ORDEN else 99)
+
+        # Estadísticas de asistencia del mes actual
+        tz= timezone.get_current_timezone()
+        hoy = timezone.localtime(timezone.now()).date()
+        primer_dia_mes = hoy.replace(day=1)
+        inicio_mes= timezone.make_aware(datetime.datetime.combine(primer_dia_mes, datetime.time.min), tz)
+        fin_mes = timezone.make_aware(datetime.datetime.combine(hoy, datetime.time.max), tz)
+
+        from apps.asistencia.models import RegistroAsistencia, AusenciaAutomatica
+        dias_transcurridos = (hoy - primer_dia_mes).days + 1
+
+        presentes = RegistroAsistencia.objects.filter(
+            empleado=empleado,
+            timestamp__range=(inicio_mes, fin_mes),
+            tipo='entrada', estado='verificado'
+        ).values('timestamp__date').distinct().count()
+
+        ausentes = AusenciaAutomatica.objects.filter(
+            empleado=empleado,
+            fecha__gte=primer_dia_mes,
+            fecha__lte=hoy
+        ).count()
+
+        retrasos = RegistroAsistencia.objects.filter(
+            empleado=empleado,
+            timestamp__range=(inicio_mes, fin_mes),
+            tipo='entrada', es_retardo=True
+        ).count()
+
+        indice = round((presentes / dias_transcurridos * 100), 1) if dias_transcurridos > 0 else 0
+
+        # Últimos 5 registros
+        ultimos = RegistroAsistencia.objects.filter(
+            empleado=empleado
+        ).order_by('-timestamp')[:5]
+
+        return Response({
+            'id': empleado.id,
+            'cedula': empleado.cedula,
+            'nombres': empleado.nombres,
+            'apellidos': empleado.apellidos,
+            'nombre_completo':empleado.nombre_completo,
+            'tipo': empleado.tipo,
+            'cargo': empleado.cargo,
+            'departamento': empleado.departamento.nombre,
+            'email': empleado.email,
+            'telefono': empleado.telefono,
+            'fecha_ingreso': empleado.fecha_ingreso.strftime('%d/%m/%Y'),
+            'activo': empleado.activo,
+            'foto': request.build_absolute_uri(empleado.foto.url) if empleado.foto else None,
+            'huellas': huellas_data,
+            'horarios': horarios_data,
+            'estadisticas': {
+                'presentes': presentes,
+                'ausentes': ausentes,
+                'retrasos': retrasos,
+                'indice': indice,
+                'dias': dias_transcurridos,
+            },
+            'ultimos_registros': [{
+                'tipo': r.tipo,
+                'hora':timezone.localtime(r.timestamp).strftime('%I:%M %p'),
+                'fecha':timezone.localtime(r.timestamp).strftime('%d/%m/%Y'),
+                'es_retardo':r.es_retardo,
+            } for r in ultimos],
+        })

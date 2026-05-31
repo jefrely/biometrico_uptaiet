@@ -259,32 +259,95 @@ class DashboardView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        hoy = timezone.now().date()
-        inicio = timezone.make_aware(datetime.datetime.combine(hoy, datetime.time.min))
-        fin = timezone.make_aware(datetime.datetime.combine(hoy, datetime.time.max))
+        from apps.personal.models import Empleado
 
-        total_personal = Empleado.objects.filter(activo=True).count()
+        tz     = timezone.get_current_timezone()
+        ahora  = timezone.localtime(timezone.now())
+        hoy    = ahora.date()
+        inicio = timezone.make_aware(datetime.datetime.combine(hoy, datetime.time.min), tz)
+        fin    = timezone.make_aware(datetime.datetime.combine(hoy, datetime.time.max), tz)
+
+        # Inicio del mes
+        primer_dia_mes = hoy.replace(day=1)
+        inicio_mes     = timezone.make_aware(datetime.datetime.combine(primer_dia_mes, datetime.time.min), tz)
+
+        total_personal  = Empleado.objects.filter(activo=True).count()
+
         asistencias_hoy = RegistroAsistencia.objects.filter(
-            timestamp__range=(inicio, fin),
+            timestamp__range=(inicio, fin), tipo='entrada', estado='verificado'
+        ).values('empleado').distinct().count()
+
+        retrasos_hoy = RegistroAsistencia.objects.filter(
+            timestamp__range=(inicio, fin), tipo='entrada', es_retardo=True
+        ).count()
+
+        inasistencias_hoy = AusenciaAutomatica.objects.filter(fecha=hoy).count()
+
+        # Estadísticas del mes
+        dias_transcurridos = (hoy - primer_dia_mes).days + 1
+
+        presentes_mes = RegistroAsistencia.objects.filter(
+            timestamp__range=(inicio_mes, fin),
             tipo='entrada',
             estado='verificado'
-        ).values('empleado').distinct().count()
-        retrasos_hoy= RegistroAsistencia.objects.filter(
-            timestamp__range=(inicio, fin),
+        ).values('empleado', 'timestamp__date').distinct().count()
+
+        ausentes_mes = AusenciaAutomatica.objects.filter(
+            fecha__gte=primer_dia_mes,
+            fecha__lte=hoy
+        ).count()
+
+        retrasos_mes = RegistroAsistencia.objects.filter(
+            timestamp__range=(inicio_mes, fin),
             tipo='entrada',
             es_retardo=True
         ).count()
-        inasistencias_hoy = AusenciaAutomatica.objects.filter(fecha=hoy).count()
+
+        total_posible = total_personal * dias_transcurridos
+        indice = round((presentes_mes / total_posible * 100), 1) if total_posible > 0 else 0
+
+        # Gráfica por día del mes
+        grafica_mes = []
+        for dia_num in range(1, dias_transcurridos + 1):
+            fecha_dia = primer_dia_mes.replace(day=dia_num)
+            ini_dia = timezone.make_aware(datetime.datetime.combine(fecha_dia, datetime.time.min), tz)
+            fin_dia = timezone.make_aware(datetime.datetime.combine(fecha_dia, datetime.time.max), tz)
+
+            presentes_dia = RegistroAsistencia.objects.filter(
+                timestamp__range=(ini_dia, fin_dia),
+                tipo='entrada', estado='verificado'
+            ).values('empleado').distinct().count()
+
+            ausentes_dia= AusenciaAutomatica.objects.filter(fecha=fecha_dia).count()
+            retrasos_dia= RegistroAsistencia.objects.filter(
+                timestamp__range=(ini_dia, fin_dia),
+                tipo='entrada', es_retardo=True
+            ).count()
+
+            grafica_mes.append({
+                'dia':dia_num,
+                'presentes': presentes_dia,
+                'ausentes': ausentes_dia,
+                'retrasos': retrasos_dia,
+            })
 
         ultimos = RegistroAsistencia.objects.filter(
             timestamp__range=(inicio, fin)
         ).select_related('empleado').order_by('-timestamp')[:10]
 
         return Response({
-            'total_personal':total_personal,
+            'total_personal': total_personal,
             'asistencias_hoy': asistencias_hoy,
             'retrasos_hoy': retrasos_hoy,
             'inasistencias_hoy': inasistencias_hoy,
+            'mes': {
+                'presentes':presentes_mes,
+                'ausentes': ausentes_mes,
+                'retrasos':retrasos_mes,
+                'indice': indice,
+               'dias': dias_transcurridos,
+            },
+            'grafica_mes': grafica_mes,
             'ultimos_registros': RegistroAsistenciaSerializer(ultimos, many=True).data
         })
 
@@ -410,6 +473,7 @@ class PermisoListView(APIView):
                 'observacion':p.observacion,
                 'aprobado_por':p.aprobado_por.username if p.aprobado_por else None,
                 'created_at':timezone.localtime(p.created_at).strftime('%d/%m/%Y'),
+                'documento': request.build_absolute_uri(p.documento.url) if p.documento else None,
             })
         return Response(data)
 
@@ -417,32 +481,35 @@ class PermisoListView(APIView):
         from .models import PermisoEmpleado
         from apps.personal.models import Empleado
 
-        if request.user.rol not in ('admin', 'supervisor'):
+        if request.user.rol not in ('admin', 'supervisor', 'operador'):
             return Response({'error': 'Sin permisos.'}, status=403)
-
         empleado_id= request.data.get('empleado_id')
         tipo= request.data.get('tipo')
         fecha_inicio= request.data.get('fecha_inicio')
-        fecha_fin = request.data.get('fecha_fin')
-        motivo = request.data.get('motivo', '')
+        fecha_fin= request.data.get('fecha_fin')
+        motivo= request.data.get('motivo', '')
 
-        if not all([empleado_id, tipo, fecha_inicio, fecha_fin]):
-            return Response({'error':'Faltan campos requeridos.'}, status=400)
+        if not all([empleado_id,tipo,fecha_inicio,fecha_fin]):
+            return Response({'error': 'Faltan campos requeridos.'}, status=400)
 
         try:
-            empleado = Empleado.objects.get(id=empleado_id, activo=True)
+            empleado= Empleado.objects.get(id=empleado_id, activo=True)
         except Empleado.DoesNotExist:
-            return Response({'error':'Empleado no encontrado.'}, status=404)
+            return Response({'error': 'Empleado no encontrado.'}, status=404)
 
-        permiso= PermisoEmpleado.objects.create(
-            empleado= empleado,
-            tipo= tipo,
-            fecha_inicio= fecha_inicio,
+        permiso = PermisoEmpleado.objects.create(
+            empleado=empleado,
+            tipo=tipo,
+            fecha_inicio=fecha_inicio,
             fecha_fin=fecha_fin,
-            motivo= motivo,
-            estado= 'PENDIENTE',
+            motivo=motivo,
+            estado='PENDIENTE',
         )
 
+        # Guardar documento si viene adjunto
+        if 'documento' in request.FILES:
+            permiso.documento = request.FILES['documento']
+            permiso.save()
         return Response({'ok': True, 'id': permiso.id, 'msg': 'Permiso creado correctamente.'}, status=201)
 
 
@@ -452,7 +519,7 @@ class PermisoDetailView(APIView):
     def put(self, request, permiso_id):
         from .models import PermisoEmpleado
 
-        if request.user.rol != 'admin':
+        if request.user.rol not in ('admin', 'supervisor'):
             return Response({'error': 'Sin permisos.'}, status=403)
 
         try:

@@ -14,6 +14,7 @@ export default function Personal() {
   const [empleadoEditando, setEmpleadoEditando] = useState(null)
   const [mensaje, setMensaje] = useState(null)
   const navigate = useNavigate()
+  const [mostrarInactivos, setMostrarInactivos] = useState(false)
 
   const formVacio = {
     cedula: '', nombres: '', apellidos: '', tipo: 'docente',
@@ -24,7 +25,7 @@ export default function Personal() {
   const cargar = async () => {
     try {
       const [empRes, depRes] = await Promise.all([
-        api.get('/personal/empleados/'),
+        api.get(`/personal/empleados/?incluir_inactivos=${mostrarInactivos}`),
         api.get('/personal/departamentos/')
       ])
       setEmpleados(empRes.data)
@@ -36,7 +37,7 @@ export default function Personal() {
     }
   }
 
-  useEffect(() => { cargar() }, [])
+  useEffect(() => { cargar() }, [mostrarInactivos])
 
   const mostrarMensaje = (texto, tipo = 'ok') => {
     setMensaje({ texto, tipo })
@@ -98,6 +99,17 @@ export default function Personal() {
     }
   }
 
+  const reactivar = async (emp) => {
+    if (!window.confirm(`¿Reactivar a ${emp.nombre_completo}?`)) return
+    try {
+      await api.put(`/personal/empleados/${emp.id}/`, { activo: true })
+      mostrarMensaje('Empleado reactivado correctamente')
+      cargar()
+    } catch {
+      mostrarMensaje('Error al reactivar', 'error')
+    }
+  }
+
   const registrarHuella = (emp) => {
   navigate(`/huellas/${emp.id}`)
 }
@@ -119,19 +131,6 @@ export default function Personal() {
   return (
     <div className="min-h-screen bg-gray-100">
 
-      {/* Navbar */}
-      <nav className="bg-blue-900 text-white px-6 py-4 flex items-center justify-between shadow">
-        <div>
-          <h1 className="text-xl font-bold">UPTAIET</h1>
-          <p className="text-blue-300 text-xs">Sistema de Control de Asistencia</p>
-        </div>
-        <div className="flex items-center gap-6">
-          <a href="/marcaje"   className="text-blue-200 hover:text-white text-sm">Marcaje</a>
-          <a href="/dashboard" className="text-blue-200 hover:text-white text-sm">Dashboard</a>
-          <span className="text-blue-300 text-sm">{usuario?.username}</span>
-        </div>
-      </nav>
-
       <div className="max-w-7xl mx-auto px-6 py-8">
 
         {/* Mensaje */}
@@ -148,7 +147,7 @@ export default function Personal() {
         {/* Encabezado */}
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold text-gray-800">Gestión de Personal</h2>
-          {usuario?.rol === 'admin' && (
+          {(usuario?.rol === 'admin' || (usuario?.modulos || []).includes('personal')) && (
             <button
               onClick={abrirCrear}
               className="bg-blue-900 text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-blue-800 transition"
@@ -159,6 +158,17 @@ export default function Personal() {
         </div>
 
         {/* Filtros */}
+        <button
+          onClick={() => setMostrarInactivos(!mostrarInactivos)}
+          className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${
+            mostrarInactivos
+              ? 'bg-red-100 text-red-700 border border-red-300'
+              : 'bg-gray-100 text-gray-600 border border-gray-300'
+          }`}
+        >
+          {mostrarInactivos ? 'Ocultar inactivos' : 'Ver inactivos'}
+        </button>
+
         <div className="flex gap-4 mb-6">
           <input
             type="text"
@@ -222,28 +232,36 @@ export default function Personal() {
                       <span className="text-red-500 text-xs font-medium">❌ Sin huella</span>
                     )}
                   </td>
-                  {usuario?.rol === 'admin' && (
+                  {(usuario?.rol === 'admin' || (usuario?.modulos || []).includes('personal')) && (
                     <td className="py-3 px-4">
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => abrirEditar(emp)}
-                          className="text-blue-600 hover:text-blue-800 text-xs font-medium"
-                        >
-                          Editar
+
+                      <div className="flex gap-2 flex-wrap">
+                        <button onClick={() => navigate(`/perfil/${emp.id}`)}
+                          className="text-purple-600 hover:text-purple-800 text-xs font-medium">
+                          Ver perfil
                         </button>
-                        <button
-                          onClick={() => registrarHuella(emp)}
-                          className="text-green-600 hover:text-green-800 text-xs font-medium"
-                        >
-                          Huella
-                        </button>
-                        <button
-                          onClick={() => desactivar(emp)}
-                          className="text-red-500 hover:text-red-700 text-xs font-medium"
-                        >
-                          Desactivar
-                        </button>
-                      </div>
+                        {emp.activo ? (
+                          <>
+                           <button onClick={() => abrirEditar(emp)}
+                             className="text-blue-600 hover:text-blue-800 text-xs font-medium">
+                             Editar
+                           </button>
+                           <button onClick={() => registrarHuella(emp)}
+                             className="text-green-600 hover:text-green-800 text-xs font-medium">
+                             Huella
+                           </button>
+                           <button onClick={() => desactivar(emp)}
+                             className="text-red-500 hover:text-red-700 text-xs font-medium">
+                             Desactivar
+                           </button>
+                         </>
+                        ) : (
+                          <button onClick={() => reactivar(emp)}
+                            className="text-emerald-600 hover:text-emerald-800 text-xs font-medium font-bold">
+                            Reactivar
+                          </button>
+                        )}
+                     </div>
                     </td>
                   )}
                 </tr>

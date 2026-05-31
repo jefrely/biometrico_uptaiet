@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import api from '../services/api'
-import Navbar from '../components/Navbar'
 
 export default function Reportes() {
   const [descargando, setDescargando] = useState(null)
@@ -28,9 +27,9 @@ export default function Reportes() {
 
   const reportes = [
     {
-      titulo:      'Reporte Diario',
+      titulo:'Reporte Diario',
       descripcion: 'Asistencia del dia de hoy',
-      icono:       '📅',
+      icono:'📅',
       color:       'blue',
       acciones: [
         { label: 'PDF',   url: '/reportes/pdf/diario/',   nombre: 'asistencia_diaria.pdf',  tipo: 'pdf'   },
@@ -67,8 +66,7 @@ export default function Reportes() {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      {/* Barra superior */}
-      <Navbar />
+      
 
       <div className="max-w-4xl mx-auto p-6">
         <p className="text-gray-600 mb-6">

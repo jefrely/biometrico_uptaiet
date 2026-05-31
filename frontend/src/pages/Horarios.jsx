@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import Navbar from '../components/Navbar'
 import api from '../services/api'
 
 const DIAS = [
@@ -119,7 +118,6 @@ export default function Horarios() {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      <Navbar />
 
       <div className="max-w-7xl mx-auto px-6 py-8">
         <h2 className="text-2xl font-bold text-gray-800 mb-6">Gestión de Horarios</h2>

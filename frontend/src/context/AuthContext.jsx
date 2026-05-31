@@ -4,7 +4,7 @@ import api from '../services/api'
 const AuthContext = createContext()
 
 export function AuthProvider({ children }) {
-  const [usuario, setUsuario] = useState(null)
+  const [usuario, setUsuario]  = useState(null)
   const [cargando, setCargando] = useState(true)
 
   useEffect(() => {
@@ -24,9 +24,11 @@ export function AuthProvider({ children }) {
 
   const login = async (username, password) => {
     const res = await api.post('/auth/login/', { username, password })
-    localStorage.setItem('access_token', res.data.access)
+    localStorage.setItem('access_token',  res.data.access)
     localStorage.setItem('refresh_token', res.data.refresh)
-    setUsuario(res.data.usuario)
+    // Cargar perfil completo con módulos
+    const perfil = await api.get('/auth/perfil/')
+    setUsuario(perfil.data)
     return res.data
   }
 

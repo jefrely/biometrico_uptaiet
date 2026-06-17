@@ -7,13 +7,15 @@ class RegistroAsistencia (models.Model):
 
     TIPO_CHOICES =[
         ('entrada', 'Entrada'),
-        ('salida',  'Salida'),
+        ('salida', 'Salida'),
+        ('salida_almuerzo', 'Salida Almuerzo'),
+        ('entrada_almuerzo','Entrada Almuerzo'),
     ]
 
     ESTADO_CHOICES =[
-        ("verificado",   "Verificado"),
-        ("fallido",   "Fallido"),
-        ("manual",   "Manual"),
+        ("verificado", "Verificado"),
+        ("fallido", "Fallido"),
+        ("manual", "Manual"),
     ]
 
     empleado = models.ForeignKey(
@@ -30,7 +32,7 @@ class RegistroAsistencia (models.Model):
     )
 
 
-    tipo = models.CharField(max_length=10, choices=TIPO_CHOICES)
+    tipo = models.CharField(max_length=20, choices=TIPO_CHOICES)
     estado = models.CharField(max_length=15, choices=ESTADO_CHOICES, default="vereficado")
     timestamp =models.DateTimeField(auto_now_add=True)
     score_verificacion = models.IntegerField (default=0)
@@ -39,6 +41,11 @@ class RegistroAsistencia (models.Model):
     horas_trabajadas = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
     ip_origen = models.GenericIPAddressField(null=True, blank=True)
     observacion = models.TextField(blank=True)
+    es_almuerzo = models.BooleanField(default=False)
+    minutos_antes = models.IntegerField(default=0)
+    horas_extras= models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    horas_faltantes= models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    sin_horario = models.BooleanField(default=False)
 
     class Meta:
         db_table = "registros_asistencia"

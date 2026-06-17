@@ -22,15 +22,16 @@ export function AuthProvider({ children }) {
     }
   }, [])
 
-  const login = async (username, password) => {
-    const res = await api.post('/auth/login/', { username, password })
-    localStorage.setItem('access_token',  res.data.access)
-    localStorage.setItem('refresh_token', res.data.refresh)
-    // Cargar perfil completo con módulos
-    const perfil = await api.get('/auth/perfil/')
-    setUsuario(perfil.data)
-    return res.data
-  }
+  const login = async (username, password, pin = '') => {
+  const body = { username, password }
+  if (pin) body.pin = pin
+  const res = await api.post('/auth/login/', body)
+  localStorage.setItem('access_token',  res.data.access)
+  localStorage.setItem('refresh_token', res.data.refresh)
+  const perfil = await api.get('/auth/perfil/')
+  setUsuario(perfil.data)
+  return res.data
+}
 
   const logout = () => {
     localStorage.removeItem('access_token')

@@ -2,7 +2,24 @@ import { useState } from 'react'
 import api from '../services/api'
 
 export default function Reportes() {
-  const [descargando, setDescargando] = useState(null)
+  const hoy= new Date()
+  const hoyStr= hoy.toISOString().split('T')[0]
+
+  const [descargando,setDescargando] = useState(null)
+
+  // Selectores por tipo
+  const [fechaDia,setFechaDia] = useState(hoyStr)
+  const [fechaSem,setFechaSem] = useState(hoyStr)
+  const [mesAnio,setMesAnio] = useState({
+    mes:  hoy.getMonth() + 1,
+    anio: hoy.getFullYear()
+  })
+
+  const MESES = [
+    'Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'
+  ]
+
+  const anios = Array.from({ length: 5 }, (_, i) => hoy.getFullYear() - i)
 
   const descargar = async (url, nombre, tipo) => {
     setDescargando(nombre)
@@ -14,113 +31,160 @@ export default function Reportes() {
           : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
       })
       const link = document.createElement('a')
-      link.href  = URL.createObjectURL(blob)
+      link.href = URL.createObjectURL(blob)
       link.download = nombre
       link.click()
       URL.revokeObjectURL(link.href)
     } catch {
-      alert('Error al generar el reporte. Intente de nuevo.')
+      alert('Error al generar el reporte.')
     } finally {
       setDescargando(null)
     }
   }
 
-  const reportes = [
-    {
-      titulo:'Reporte Diario',
-      descripcion: 'Asistencia del dia de hoy',
-      icono:'📅',
-      color:       'blue',
-      acciones: [
-        { label: 'PDF',   url: '/reportes/pdf/diario/',   nombre: 'asistencia_diaria.pdf',  tipo: 'pdf'   },
-        { label: 'Excel', url: '/reportes/excel/diario/', nombre: 'asistencia_diaria.xlsx', tipo: 'excel' },
-      ]
-    },
-    {
-      titulo:      'Reporte Semanal',
-      descripcion: 'Asistencia de la semana actual (lunes a hoy)',
-      icono:       '📆',
-      color:       'green',
-      acciones: [
-        { label: 'PDF',   url: '/reportes/pdf/semanal/',   nombre: 'asistencia_semanal.pdf',  tipo: 'pdf'   },
-        { label: 'Excel', url: '/reportes/excel/semanal/', nombre: 'asistencia_semanal.xlsx', tipo: 'excel' },
-      ]
-    },
-    {
-      titulo:      'Reporte Mensual',
-      descripcion: 'Asistencia del mes actual completo',
-      icono:       '🗓️',
-      color:       'purple',
-      acciones: [
-        { label: 'PDF',   url: '/reportes/pdf/mensual/',   nombre: 'asistencia_mensual.pdf',  tipo: 'pdf'   },
-        { label: 'Excel', url: '/reportes/excel/mensual/', nombre: 'asistencia_mensual.xlsx', tipo: 'excel' },
-      ]
-    },
-  ]
-
-  const colores = {
-    blue:   { card: 'border-blue-200 bg-blue-50',   icono: 'bg-blue-100',   btn: 'bg-blue-700 hover:bg-blue-800'   },
-    green:  { card: 'border-green-200 bg-green-50', icono: 'bg-green-100',  btn: 'bg-green-700 hover:bg-green-800' },
-    purple: { card: 'border-purple-200 bg-purple-50',icono:'bg-purple-100', btn: 'bg-purple-700 hover:bg-purple-800'},
-  }
+  const btnClass = (nombre, color) =>
+    `px-4 py-2 rounded-lg text-white text-sm font-semibold transition disabled:opacity-50 ${color} hover:opacity-90`
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      
+    <div className="space-y-6 max-w-3xl">
+      <div>
+        <h2 className="text-2xl font-bold text-gray-800">Reportes de Asistencia</h2>
+        <p className="text-gray-400 text-sm">Selecciona el período y descarga en PDF o Excel</p>
+      </div>
 
-      <div className="max-w-4xl mx-auto p-6">
-        <p className="text-gray-600 mb-6">
-          Selecciona el tipo de reporte y el formato de descarga.
-          Los reportes incluyen: nombre del empleado, cedula, departamento,
-          hora de entrada, hora de salida y estado (a tiempo / retraso).
+      {/* ── Reporte Diario ── */}
+      <div className="bg-white rounded-2xl shadow p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center text-xl">📅</div>
+          <div>
+            <h3 className="font-bold text-gray-800">Reporte Diario</h3>
+            <p className="text-gray-400 text-xs">Asistencia de un día específico</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-4 flex-wrap">
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Seleccionar día</label>
+            <input type="date" value={fechaDia} max={hoyStr}
+              onChange={e => setFechaDia(e.target.value)}
+              className="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+          </div>
+          <div className="flex gap-2 mt-4">
+            <button
+              disabled={descargando === 'diario.pdf'}
+              onClick={() => descargar(`/reportes/pdf/diario/?fecha=${fechaDia}`, `diario_${fechaDia}.pdf`, 'pdf')}
+              className={btnClass('diario.pdf', 'bg-red-600')}>
+              {descargando === 'diario.pdf' ? 'Generando...' : 'PDF'}
+            </button>
+            <button
+              disabled={descargando === 'diario.xlsx'}
+              onClick={() => descargar(`/reportes/excel/diario/?fecha=${fechaDia}`, `diario_${fechaDia}.xlsx`, 'excel')}
+              className={btnClass('diario.xlsx', 'bg-emerald-600')}>
+              {descargando === 'diario.xlsx' ? 'Generando...' : 'Excel'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Reporte Semanal ── */}
+      <div className="bg-white rounded-2xl shadow p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center text-xl">📆</div>
+          <div>
+            <h3 className="font-bold text-gray-800">Reporte Semanal</h3>
+            <p className="text-gray-400 text-xs">Selecciona cualquier día de la semana que quieres descargar</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-4 flex-wrap">
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Cualquier día de esa semana</label>
+            <input type="date" value={fechaSem} max={hoyStr}
+              onChange={e => setFechaSem(e.target.value)}
+              className="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+          </div>
+          <div className="flex gap-2 mt-4">
+            <button
+              disabled={descargando === 'semanal.pdf'}
+              onClick={() => descargar(`/reportes/pdf/semanal/?fecha=${fechaSem}`, `semanal_${fechaSem}.pdf`, 'pdf')}
+              className={btnClass('semanal.pdf', 'bg-red-600')}>
+              {descargando === 'semanal.pdf' ? 'Generando...' : 'PDF'}
+            </button>
+            <button
+              disabled={descargando === 'semanal.xlsx'}
+              onClick={() => descargar(`/reportes/excel/semanal/?fecha=${fechaSem}`, `semanal_${fechaSem}.xlsx`, 'excel')}
+              className={btnClass('semanal.xlsx', 'bg-emerald-600')}>
+              {descargando === 'semanal.xlsx' ? 'Generando...' : 'Excel'}
+            </button>
+          </div>
+        </div>
+        <p className="text-xs text-gray-400 mt-3">
+          El reporte incluye desde el lunes hasta el domingo de la semana seleccionada.
         </p>
+      </div>
 
-        <div className="grid gap-6">
-          {reportes.map((r) => {
-            const c = colores[r.color]
-            return (
-              <div key={r.titulo} className={`border-2 rounded-xl p-6 ${c.card}`}>
-                <div className="flex items-start gap-4">
-                  <div className={`w-14 h-14 rounded-xl flex items-center justify-center text-2xl ${c.icono}`}>
-                    {r.icono}
-                  </div>
-                  <div className="flex-1">
-                    <h2 className="text-lg font-bold text-gray-800">{r.titulo}</h2>
-                    <p className="text-gray-500 text-sm mb-4">{r.descripcion}</p>
-                    <div className="flex gap-3">
-                      {r.acciones.map((a) => (
-                        <button
-                          key={a.label}
-                          onClick={() => descargar(a.url, a.nombre, a.tipo)}
-                          disabled={descargando === a.nombre}
-                          className={`px-5 py-2 rounded-lg text-white font-semibold text-sm transition ${c.btn} disabled:opacity-50`}
-                        >
-                          {descargando === a.nombre
-                            ? 'Generando...'
-                            : `Descargar ${a.label}`}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )
-          })}
+      {/* ── Reporte Mensual ── */}
+      <div className="bg-white rounded-2xl shadow p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center text-xl">🗓️</div>
+          <div>
+            <h3 className="font-bold text-gray-800">Reporte Mensual</h3>
+            <p className="text-gray-400 text-xs">Asistencia completa de un mes</p>
+          </div>
         </div>
+        <div className="flex items-center gap-4 flex-wrap">
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Mes</label>
+            <select value={mesAnio.mes}
+              onChange={e => setMesAnio({...mesAnio, mes: parseInt(e.target.value)})}
+              className="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              {MESES.map((m, i) => (
+                <option key={i+1} value={i+1}>{m}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Año</label>
+            <select value={mesAnio.anio}
+              onChange={e => setMesAnio({...mesAnio, anio: parseInt(e.target.value)})}
+              className="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              {anios.map(a => (
+                <option key={a} value={a}>{a}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex gap-2 mt-4">
+            <button
+              disabled={descargando === 'mensual.pdf'}
+              onClick={() => descargar(
+                `/reportes/pdf/mensual/?mes=${mesAnio.mes}&anio=${mesAnio.anio}`,
+                `mensual_${mesAnio.mes}_${mesAnio.anio}.pdf`, 'pdf'
+              )}
+              className={btnClass('mensual.pdf', 'bg-red-600')}>
+              {descargando === 'mensual.pdf' ? 'Generando...' : 'PDF'}
+            </button>
+            <button
+              disabled={descargando === 'mensual.xlsx'}
+              onClick={() => descargar(
+                `/reportes/excel/mensual/?mes=${mesAnio.mes}&anio=${mesAnio.anio}`,
+                `mensual_${mesAnio.mes}_${mesAnio.anio}.xlsx`, 'excel'
+              )}
+              className={btnClass('mensual.xlsx', 'bg-emerald-600')}>
+              {descargando === 'mensual.xlsx' ? 'Generando...' : 'Excel'}
+            </button>
+          </div>
+        </div>
+      </div>
 
-        {/* Info adicional */}
-        <div className="mt-8 bg-white rounded-xl border border-gray-200 p-5">
-          <h3 className="font-semibold text-gray-700 mb-2">Contenido de los reportes</h3>
-          <ul className="text-sm text-gray-600 space-y-1">
-            <li>✅ Nombre completo del empleado</li>
-            <li>✅ Cedula de identidad</li>
-            <li>✅ Departamento</li>
-            <li>✅ Tipo (docente, obrero, administrativo)</li>
-            <li>✅ Hora de entrada y salida</li>
-            <li>✅ Estado (a tiempo o retraso con minutos)</li>
-            <li>✅ Totales y resumen al final</li>
-          </ul>
-        </div>
+      {/* Contenido de los reportes */}
+      <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5">
+        <h3 className="font-semibold text-blue-800 mb-2">Contenido de los reportes</h3>
+        <ul className="text-sm text-blue-700 space-y-1">
+          <li>✅ Nombre completo del empleado</li>
+          <li>✅ Cédula de identidad</li>
+          <li>✅ Departamento y tipo</li>
+          <li>✅ Hora de entrada y salida (hora local Venezuela)</li>
+          <li>✅ Estado: A tiempo o Retraso con minutos</li>
+          <li>✅ Totales al final del reporte</li>
+        </ul>
       </div>
     </div>
   )

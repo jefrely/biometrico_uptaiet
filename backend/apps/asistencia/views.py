@@ -46,117 +46,236 @@ class MarcarAsistenciaView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
+        import datetime
+        from apps.usuarios.models import ConfiguracionSistema
+
         tipo = request.data.get('tipo', 'entrada')
 
-        if tipo not in ('entrada', 'salida'):
-            return Response({'ok': False, 'msg': 'Tipo invalido. Use entrada o salida.'}, status=400)
+        if tipo not in ('entrada', 'salida', 'salida_almuerzo', 'entrada_almuerzo'):
+            return Response({'ok': False, 'msg': 'Tipo de marcaje inválido.'}, status=400)
 
-        # Inicializar escaner
+        config = ConfiguracionSistema.obtener()
+        tz = timezone.get_current_timezone()
+        ahora = timezone.localtime(timezone.now())
+        hoy = ahora.date()
+
         service = obtener_servicio_zk()
         if service is None:
             return Response({
-                'ok':  False,
-                'msg': 'Escaner no disponible. Verifique que este conectado al USB.'
+                'ok': False,
+                'msg': 'Escáner no disponible. Verifique que esté conectado al USB.'
             }, status=503)
 
-        # Cargar todos los templates activos de la BD
         huellas = HuellaDigital.objects.filter(activa=True).select_related('empleado')
         if not huellas.exists():
             service.cerrar()
-            return Response({
-                'ok': False,
-                'msg':'No hay huellas registradas en el sistema.'
-            }, status=400)
+            return Response({'ok': False, 'msg': 'No hay huellas registradas en el sistema.'}, status=400)
 
-        templates_bd = [
-            (bytes(h.template_encriptado), h.empleado.id)
-            for h in huellas
-        ]
-
-        # Verificar huella
+        templates_bd = [(bytes(h.template_encriptado), h.empleado.id) for h in huellas]
         resultado = service.verificar_huella(templates_bd)
-        service.cerrar()  # Siempre cerrar el escaner al terminar
+        service.cerrar()
 
         if not resultado['ok']:
-            return Response({
-                'ok': False,
-                'msg': resultado['msg'],
-                'tip': 'Coloque el dedo centrado sobre el sensor.'
-            })
+            return Response({'ok': False, 'msg': resultado['msg'], 'tip': 'Coloque el dedo centrado sobre el sensor.'})
 
-        # Obtener el empleado identificado
+        from apps.personal.models import Empleado, Horario
         try:
             empleado = Empleado.objects.get(id=resultado['empleado_id'], activo=True)
         except Empleado.DoesNotExist:
-            return Response({'ok': False, 'msg': 'Empleado no encontrado o inactivo.'}, status=404)
+            return Response({'ok': False, 'msg': 'Empleado no encontrado o inactivo.'})
 
-        # Detectar doble marcaje (mismo tipo en los ultimos 5 minutos)
-        cinco_min = timezone.now() - datetime.timedelta(minutes=5)
-        ya_marco  = RegistroAsistencia.objects.filter(
+        inicio_dia = timezone.make_aware(datetime.datetime.combine(hoy, datetime.time.min), tz)
+        fin_dia= timezone.make_aware(datetime.datetime.combine(hoy, datetime.time.max), tz)
+
+        # ── Validación de doble marcaje ──
+        registros_hoy = RegistroAsistencia.objects.filter(
             empleado=empleado,
-            tipo=tipo,
-            timestamp__gte=cinco_min
-        ).exists()
+            timestamp__range=(inicio_dia, fin_dia)
+        ).order_by('timestamp')
 
-        if ya_marco:
-            return Response({
-                'ok': False,
-                'msg': f'Ya registro {tipo} recientemente. Espere unos minutos.',
-                'empleado': empleado.nombre_completo
-            })
+        ultimo = registros_hoy.last()
 
-        # Calcular si hay retardo
-        es_retardo= False
-        minutos_retardo = 0
-        ahora = timezone.now()
+        # No puede marcar entrada si ya marcó entrada sin salida
+        if tipo == 'entrada':
+            if ultimo and ultimo.tipo in ('entrada', 'entrada_almuerzo'):
+                return Response({
+                    'ok':False,
+                    'msg':f'Ya registró {ultimo.get_tipo_display()} a las {timezone.localtime(ultimo.timestamp).strftime("%I:%M %p")}. Debe marcar salida primero.',
+                    'empleado':empleado.nombre_completo
+                })
+
+        # No puede marcar salida sin entrada previa
+        if tipo in ('salida', 'salida_almuerzo'):
+            if not ultimo or ultimo.tipo in ('salida', 'salida_almuerzo'):
+                return Response({
+                    'ok':  False,
+                    'msg': 'No puede registrar salida sin haber marcado entrada primero.',
+                    'empleado': empleado.nombre_completo
+                })
+
+        # No puede marcar entrada_almuerzo sin salida_almuerzo
+        if tipo == 'entrada_almuerzo':
+            if not ultimo or ultimo.tipo != 'salida_almuerzo':
+                return Response({
+                    'ok':  False,
+                    'msg': 'Debe registrar salida de almuerzo antes de marcar entrada de almuerzo.',
+                    'empleado': empleado.nombre_completo
+                })
+
+        # ── Verificar horario del día ──
         dias_map = {
-            'monday': 'lunes', 'tuesday': 'martes', 'wednesday': 'miercoles',
-            'thursday': 'jueves', 'friday': 'viernes',
-            'saturday': 'sabado', 'sunday': 'domingo'
+            'Monday':'lunes','Tuesday':'martes','Wednesday':'miercoles',
+            'Thursday':'jueves','Friday':'viernes','Saturday':'sabado','Sunday':'domingo'
         }
-        dia_es  = dias_map.get(ahora.strftime('%A').lower(), '')
-        horario = Horario.objects.filter(empleado=empleado, dia=dia_es, activo=True).first()
+        dia_hoy= dias_map[hoy.strftime('%A')]
+        horario= Horario.objects.filter(empleado=empleado, dia=dia_hoy, activo=True).first()
+        sin_horario = horario is None
 
-        if horario and tipo == 'entrada':
-            # Usar hora LOCAL de Venezuela para comparar con el horario
-            ahora_local = timezone.localtime(ahora)
+        # ── Calcular estado del marcaje ──
+        es_retardo = False
+        minutos_retardo = 0
+        minutos_antes = 0
+        horas_extras = 0
+        horas_faltantes = 0
+        es_almuerzo = tipo in ('salida_almuerzo', 'entrada_almuerzo')
+        mensaje_estado= ''
 
-            hora_entrada_dt = datetime.datetime.combine(
-                ahora_local.date(),
-                horario.hora_entrada
-            ).replace(tzinfo=ahora_local.tzinfo)
+        hora_alm_inicio = datetime.datetime.combine(hoy, config.hora_almuerzo_inicio)
+        hora_alm_fin= datetime.datetime.combine(hoy, config.hora_almuerzo_fin)
+        hora_alm_inicio = timezone.make_aware(hora_alm_inicio, tz)
+        hora_alm_fin= timezone.make_aware(hora_alm_fin, tz)
 
-            hora_limite = hora_entrada_dt + datetime.timedelta(minutes=horario.tolerancia_min)
+        if horario and not es_almuerzo:
+            hora_entrada_horario = timezone.make_aware(
+                datetime.datetime.combine(hoy, horario.hora_entrada), tz
+            )
+            hora_salida_horario = timezone.make_aware(
+                datetime.datetime.combine(hoy, horario.hora_salida), tz
+            )
+            tolerancia = datetime.timedelta(minutes=horario.tolerancia_min)
 
-            if ahora_local > hora_limite:
-                es_retardo = True
-                diff = ahora_local - hora_entrada_dt
-                minutos_retardo = int(diff.total_seconds() / 60)
+            if tipo == 'entrada':
+                diff = ahora - hora_entrada_horario
+                if ahora > hora_entrada_horario + tolerancia:
+                    es_retardo = True
+                    minutos_retardo = int(diff.total_seconds() / 60)
+                    mensaje_estado = f'Retraso de {minutos_retardo} minutos'
+                elif ahora < hora_entrada_horario:
+                    minutos_antes = int((hora_entrada_horario - ahora).total_seconds() / 60)
+                    mensaje_estado = f'Llegó {minutos_antes} minutos antes'
+                else:
+                    mensaje_estado = 'Llegó a tiempo'
 
-        # Guardar registro de asistencia
+            elif tipo == 'salida':
+                diff = ahora - hora_salida_horario
+                seg = diff.total_seconds()
+                if ahora < hora_salida_horario:
+                    faltantes = hora_salida_horario - ahora
+                    horas_faltantes = round(faltantes.total_seconds() / 3600, 2)
+                    mensaje_estado = f'Salió {int(faltantes.total_seconds() / 60)} min antes del horario'
+                elif seg > 0:
+                    horas_extras = round(seg / 3600, 2)
+                    mensaje_estado = f'Horas extras: {horas_extras:.1f}h'
+                else:
+                    mensaje_estado = 'Salida a tiempo'
+
+                # Calcular horas trabajadas
+                entrada = registros_hoy.filter(tipo='entrada').first()
+                if entrada:
+                    tiempo_trabajado = ahora - timezone.localtime(entrada.timestamp)
+                    # Restar tiempo de almuerzo si marcó
+                    salida_alm  = registros_hoy.filter(tipo='salida_almuerzo').first()
+                    entrada_alm = registros_hoy.filter(tipo='entrada_almuerzo').first()
+                    if salida_alm and entrada_alm:
+                        tiempo_almuerzo  = timezone.localtime(entrada_alm.timestamp) - timezone.localtime(salida_alm.timestamp)
+                        tiempo_trabajado -= tiempo_almuerzo
+
+        elif tipo in ('salida_almuerzo', 'entrada_almuerzo'):
+            tol_alm = datetime.timedelta(minutes=config.tolerancia_almuerzo_min)
+            if tipo == 'salida_almuerzo':
+                if ahora < hora_alm_inicio:
+                    minutos_antes  = int((hora_alm_inicio - ahora).total_seconds() / 60)
+                    mensaje_estado = f'Salió al almuerzo {minutos_antes} min antes'
+                elif ahora > hora_alm_inicio + tol_alm:
+                    minutos_retardo = int((ahora - hora_alm_inicio).total_seconds() / 60)
+                    mensaje_estado  = f'Salió al almuerzo {minutos_retardo} min tarde'
+                else:
+                    mensaje_estado = 'Salida a almuerzo a tiempo'
+            else:
+                if ahora < hora_alm_fin:
+                    minutos_antes  = int((hora_alm_fin - ahora).total_seconds() / 60)
+                    mensaje_estado = f'Regresó del almuerzo {minutos_antes} min antes'
+                elif ahora > hora_alm_fin + tol_alm:
+                    es_retardo      = True
+                    minutos_retardo = int((ahora - hora_alm_fin).total_seconds() / 60)
+                    mensaje_estado  = f'Retraso de {minutos_retardo} min en regreso de almuerzo'
+                else:
+                    mensaje_estado = 'Regresó del almuerzo a tiempo'
+
+        # ── Calcular horas trabajadas al marcar salida ──
+        horas_trabajadas = None
+        if tipo == 'salida':
+            entrada = registros_hoy.filter(tipo='entrada').first()
+            if entrada:
+                diff_trabajo = ahora - timezone.localtime(entrada.timestamp)
+                salida_alm   = registros_hoy.filter(tipo='salida_almuerzo').first()
+                entrada_alm  = registros_hoy.filter(tipo='entrada_almuerzo').first()
+                if salida_alm and entrada_alm:
+                    diff_almuerzo = timezone.localtime(entrada_alm.timestamp) - timezone.localtime(salida_alm.timestamp)
+                    diff_trabajo -= diff_almuerzo
+                horas_trabajadas = round(diff_trabajo.total_seconds() / 3600, 2)
+
+         # ── Crear registro ──
         registro = RegistroAsistencia.objects.create(
-            empleado= empleado,
-            tipo= tipo,
-            estado= 'verificado',
+            empleado         = empleado,
+            tipo             = tipo,
+            estado           = 'verificado',
+            es_retardo       = es_retardo,
+            minutos_retardo  = minutos_retardo,
+            minutos_antes    = minutos_antes,
+            horas_extras     = horas_extras,
+            horas_faltantes  = horas_faltantes,
+            horas_trabajadas = horas_trabajadas,
+            es_almuerzo      = es_almuerzo,
+            sin_horario      = sin_horario,
+            ip_origen        = request.META.get('REMOTE_ADDR'),
             score_verificacion = resultado['score'],
-            es_retardo= es_retardo,
-            minutos_retardo = minutos_retardo,
-            ip_origen = request.META.get('REMOTE_ADDR')
         )
 
-        return Response({
-            'ok':True,
-            'empleado':empleado.nombre_completo,
-            'cedula':empleado.cedula,
-            'tipo':tipo,
-            'hora':timezone.localtime(registro.timestamp).strftime('%I:%M %p'),
-            'fecha':registro.timestamp.strftime('%d/%m/%Y'),
-            'es_retardo':es_retardo,
-            'minutos_retardo':minutos_retardo,
-            'retardo_display': _formatear_retardo(minutos_retardo),
-            'departamento':empleado.departamento.nombre,
-            'score':resultado['score']
-        })
+        # ── Respuesta ──
+        tipo_display = {
+            'entrada':          '✅ Entrada registrada',
+            'salida':           '🚪 Salida registrada',
+            'salida_almuerzo':  '🍽 Salida a almuerzo',
+            'entrada_almuerzo': '✅ Regreso de almuerzo',
+        }.get(tipo, tipo)
+
+        respuesta = {
+            'ok':              True,
+            'empleado':        empleado.nombre_completo,
+            'cedula':          empleado.cedula,
+            'tipo':            tipo,
+            'tipo_display':    tipo_display,
+            'hora':            ahora.strftime('%I:%M %p'),
+            'fecha':           ahora.strftime('%d/%m/%Y'),
+            'departamento':    empleado.departamento.nombre,
+            'cargo':           empleado.cargo,
+            'es_retardo':      es_retardo,
+            'minutos_retardo': minutos_retardo,
+            'minutos_antes':   minutos_antes,
+            'horas_extras':    float(horas_extras),
+            'horas_faltantes': float(horas_faltantes),
+            'horas_trabajadas':float(horas_trabajadas) if horas_trabajadas else None,
+            'mensaje_estado':  mensaje_estado,
+            'sin_horario':     sin_horario,
+            'es_almuerzo':     es_almuerzo,
+            'foto':            request.build_absolute_uri(empleado.foto.url) if empleado.foto else None,
+        }
+
+        if sin_horario:
+            respuesta['aviso'] = f'{empleado.nombres} no tiene horario asignado para el día de hoy.'
+
+        return Response(respuesta)
 
 
 # ── Registro de huellas (SSE — mensajes en tiempo real) ───────────────────────

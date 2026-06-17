@@ -13,6 +13,11 @@ import RegistroHuellas from './pages/RegistroHuellas'
 import PerfilEmpleado from './pages/PerfilEmpleado'
 import Usuarios from './pages/Usuarios'
 import SinPermiso from './components/SinPermiso'
+import Dispositivos from './pages/Dispositivos'
+import Configuracion from './pages/Configuracion'
+import CambiarPassword from './pages/CambiarPassword'
+import RecuperarPassword  from './pages/RecuperarPassword'
+import SeguridadPersonal from './pages/SeguridadPersonal'
 
 function RutaProtegida({ children }) {
   const { usuario, cargando } = useAuth()
@@ -52,6 +57,11 @@ function App() {
           <Route path="*" element={<Navigate to="/dashboard" />} />
           <Route path="/perfil/:empleadoId" element={<RutaProtegida><PerfilEmpleado /></RutaProtegida>}/>
           <Route path="/usuarios" element={<RutaProtegida><RutaConPermiso modulo="usuarios"><Usuarios /></RutaConPermiso></RutaProtegida>} />
+          <Route path= "/dispositivos" element={<RutaProtegida><RutaConPermiso modulo="dispositivos"><Dispositivos/></RutaConPermiso></RutaProtegida>} />
+          <Route path= "/configuracion" element={<RutaProtegida><RutaConPermiso modulo="configuracion"><Configuracion/></RutaConPermiso></RutaProtegida>} />
+          <Route path="/cambiar-password" element={<RutaProtegida><CambiarPassword /></RutaProtegida>}/>
+          <Route path="/recuperar-password" element={<RecuperarPassword />} />
+          <Route path="/seguridad-personal" element={<RutaProtegida><SeguridadPersonal /></RutaProtegida>}/>
         </Routes>
       </BrowserRouter>
     </AuthProvider>

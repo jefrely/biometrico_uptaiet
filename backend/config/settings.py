@@ -94,8 +94,13 @@ CORS_ALLOWED_ORIGINS = [
 ]
 
 STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_DIRS = [BASE_DIR.parent / 'frontend' / 'dist']
+
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+TEMPLATES[0]['DIRS'] = [BASE_DIR.parent / 'frontend' / 'dist']
 
 LANGUAGE_CODE = 'es-ve'
 TIME_ZONE = 'America/Caracas'

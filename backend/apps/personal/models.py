@@ -21,12 +21,13 @@ class Departamento (models.Model):
         
 class Empleado(models.Model):
     """
-    Representa a cada trabajador de UPTAIET(docente,obrero,administrativo)
+    Representa a cada trabajador de UPTAIET (docente, obrero, administrativo, vigilante)
     """
     TIPO_CHOICES = [
-        ("docente",   "Docente"),
-        ("obrero",   "Obrero"),
-        ("administrativo",   "Administrativo"),
+        ("docente", "Docente"),
+        ("obrero", "Obrero"),
+        ("administrativo", "Administrativo"),
+        ("vigilante", "Vigilante"),
     ]
 
     cedula = models.CharField(max_length=15, unique=True)

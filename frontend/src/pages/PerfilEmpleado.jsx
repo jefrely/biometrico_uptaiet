@@ -100,7 +100,7 @@ export default function PerfilEmpleado() {
               {[
                 { label: 'Cargo',valor: perfil.cargo },
                 { label: 'Departamento',valor: perfil.departamento },
-                { label: 'Tipo',valor: perfil.tipo, capitalize: true },
+                { label: 'Tipo',valor: perfil.tipo_display || perfil.tipo, capitalize: true },
                 { label: 'Email',valor: perfil.email },
                 { label: 'Teléfono',valor: perfil.telefono || '—' },
                 { label: 'Fecha ingreso',valor: perfil.fecha_ingreso },

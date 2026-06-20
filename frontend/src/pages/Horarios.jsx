@@ -289,9 +289,10 @@ export default function Horarios() {
                         <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
                           emp.tipo === 'docente'        ? 'bg-blue-100 text-blue-700' :
                           emp.tipo === 'obrero'         ? 'bg-yellow-100 text-yellow-700' :
-                                                          'bg-purple-100 text-purple-700'
+                          emp.tipo === 'administrativo' ? 'bg-purple-100 text-purple-700' :
+                                                          'bg-slate-100 text-slate-700'
                         }`}>
-                          {emp.tipo}
+                          {emp.tipo_display || emp.tipo}
                         </span>
                       </td>
                       {DIAS.map(d => {

@@ -149,13 +149,18 @@ class HorarioEmpleadoView(APIView):
         
         horarios = Horario.objects.filter (empleado=empleado, activo=True)
         serializer= HorarioSerializer(horarios, many=True)
+        departamento_nombre = empleado.departamento.nombre if empleado.departamento else None
+        if isinstance(departamento_nombre, str) and departamento_nombre.strip().lower() == 'personal de limpieza':
+            departamento_nombre = 'No aplica'
+
         return Response ({
             "empleado":{
                 "id": empleado.id,
                 "nombre": empleado.nombre_completo,
                 "cedula": empleado.cedula,
                 "tipo": empleado.tipo,
-                "departamento": empleado.departamento.nombre,
+                "tipo_display": empleado.get_tipo_display(),
+                "departamento": departamento_nombre,
             },
             "horarios": serializer.data
         })
@@ -276,6 +281,10 @@ class PerfilEmpleadoView(APIView):
             empleado=empleado
         ).order_by('-timestamp')[:5]
 
+        departamento_nombre = empleado.departamento.nombre if empleado.departamento else None
+        if isinstance(departamento_nombre, str) and departamento_nombre.strip().lower() == 'personal de limpieza':
+            departamento_nombre = 'No aplica'
+
         return Response({
             'id': empleado.id,
             'cedula': empleado.cedula,
@@ -283,8 +292,9 @@ class PerfilEmpleadoView(APIView):
             'apellidos': empleado.apellidos,
             'nombre_completo':empleado.nombre_completo,
             'tipo': empleado.tipo,
+            'tipo_display': empleado.get_tipo_display(),
             'cargo': empleado.cargo,
-            'departamento': empleado.departamento.nombre,
+            'departamento': departamento_nombre,
             'email': empleado.email,
             'telefono': empleado.telefono,
             'fecha_ingreso': empleado.fecha_ingreso.strftime('%d/%m/%Y'),

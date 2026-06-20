@@ -20,10 +20,14 @@ def construir_resumen(registros):
         ts_local = timezone.localtime(reg.timestamp, tz)
         clave    = (reg.empleado.id, ts_local.date())
         if clave not in resumen:
+            departamento_nombre = reg.empleado.departamento.nombre if reg.empleado.departamento else None
+            if isinstance(departamento_nombre, str) and departamento_nombre.strip().lower() == 'personal de limpieza':
+                departamento_nombre = 'No aplica'
+
             resumen[clave] = {
                 'nombre':       reg.empleado.nombre_completo,
                 'cedula':       reg.empleado.cedula,
-                'departamento': reg.empleado.departamento.nombre,
+                'departamento': departamento_nombre,
                 'tipo':         reg.empleado.tipo,
                 'fecha':        ts_local.date().strftime('%d/%m/%Y'),
                 'entrada':      '',

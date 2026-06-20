@@ -1,0 +1,35 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Entorno
+.env
+
+# Logs
+*.log
+
+# Base de datos y backups
+backups/
+*.sql
+
+# Cloudflare
+cloudflared/
+
+# Node
+node_modules/
+
+# React build
+dist/
+
+# Playwright temporales
+frontend/temp_playwright*.cjs
+
+# Archivos debug
+*debug*
+
+# Windows
+Thumbs.db
+Desktop.ini

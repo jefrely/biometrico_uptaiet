@@ -1,4 +1,0 @@
-[mi‚ 17/06/2026  0:12:10,51] ERROR al generar backup 
-[mi‚ 17/06/2026  0:12:10,53] Limpieza de backups antiguos completada 
-[mi‚ 17/06/2026  0:16:06,18] EXITOSO: backup_2026-06-17_001216.sql 
-[jue 18/06/2026  8:50:09,25] EXITOSO: backup_2026-06-18_08850.sql 

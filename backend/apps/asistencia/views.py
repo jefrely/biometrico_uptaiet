@@ -250,6 +250,10 @@ class MarcarAsistenciaView(APIView):
             'entrada_almuerzo': '✅ Regreso de almuerzo',
         }.get(tipo, tipo)
 
+        departamento_nombre = empleado.departamento.nombre if empleado.departamento else None
+        if isinstance(departamento_nombre, str) and departamento_nombre.strip().lower() == 'personal de limpieza':
+            departamento_nombre = 'No aplica'
+
         respuesta = {
             'ok':              True,
             'empleado':        empleado.nombre_completo,
@@ -258,7 +262,7 @@ class MarcarAsistenciaView(APIView):
             'tipo_display':    tipo_display,
             'hora':            ahora.strftime('%I:%M %p'),
             'fecha':           ahora.strftime('%d/%m/%Y'),
-            'departamento':    empleado.departamento.nombre,
+            'departamento':    departamento_nombre,
             'cargo':           empleado.cargo,
             'es_retardo':      es_retardo,
             'minutos_retardo': minutos_retardo,
@@ -491,12 +495,16 @@ class HistorialEmpleadoView(APIView):
         if fecha_fin:
             registros = registros.filter(timestamp__date__lte=fecha_fin)
 
+        departamento_nombre = empleado.departamento.nombre if empleado.departamento else None
+        if isinstance(departamento_nombre, str) and departamento_nombre.strip().lower() == 'personal de limpieza':
+            departamento_nombre = 'No aplica'
+
         return Response({
             'empleado': {
                 'id':empleado.id,
                 'nombre':empleado.nombre_completo,
                 'cedula':empleado.cedula,
-                'departamento': empleado.departamento.nombre,
+                'departamento': departamento_nombre,
             },
             'registros': RegistroAsistenciaSerializer(registros, many=True).data
         })
